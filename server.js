@@ -51,6 +51,12 @@ const socketIo = require('socket.io');
 const server = http.createServer(app);
 const io = socketIo(server);
 
+app.use("/test", (req, res) => {
+  res.send({
+    message: "Test route is working fine",
+    status: "success"
+  });
+});
 app.use(express.static('public'));
 
 io.on('connection', (socket) => {
@@ -93,12 +99,7 @@ app.use((req, res) => {
   });
 });
 
-app.get("/test", (req, res) => {
-  res.send({
-    message: "Test route is working fine",
-    status: "success"
-  });
-});
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {
