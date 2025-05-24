@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>🔥 Ultra Stylish WebRTC Video Call 🔥</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #0f2027, #2c5364 70%, #ff512f 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Montserrat', Arial, sans-serif;
+      overflow-x: hidden;
+    }
+    h2 {
+      font-family: 'Orbitron', Arial, sans-serif;
+      font-size: 2.8rem;
+      letter-spacing: 2px;
+      color: #fff;
+      text-shadow: 0 4px 32px #ff512f, 0 1px 0 #fff;
+      margin-bottom: 30px;
+      animation: neon-glow 2s infinite alternate;
+    }
+    @keyframes neon-glow {
+      from { text-shadow: 0 0 10px #ff512f, 0 0 20px #fff; }
+      to { text-shadow: 0 0 30px #ff512f, 0 0 60px #fff; }
+    }
+    .video-container {
+      display: flex;
+      gap: 40px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 32px;
+      box-shadow: 0 8px 32px 0 rgba(31,38,135,0.37);
+      backdrop-filter: blur(16px);
+      border: 1.5px solid rgba(255,255,255,0.18);
+      padding: 40px 60px;
+      margin-bottom: 40px;
+      transition: box-shadow 0.3s;
+      animation: floaty 4s infinite alternate;
+    }
+    @keyframes floaty {
+      from { transform: translateY(0); }
+      to { transform: translateY(-12px); }
+    }
+    video {
+      width: 380px;
+      height: 285px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #232526 0%, #414345 100%);
+      box-shadow: 0 8px 32px 0 rgba(255,81,47,0.25), 0 1.5px 8px 0 #fff2;
+      border: 3px solid transparent;
+      outline: 2px solid #ff512f;
+      transition: border 0.3s, outline 0.3s, box-shadow 0.3s;
+      object-fit: cover;
+      filter: drop-shadow(0 0 16px #ff512f88);
+      animation: video-pop 1.2s cubic-bezier(.68,-0.55,.27,1.55);
+    }
+    @keyframes video-pop {
+      0% { transform: scale(0.7) rotate(-8deg); opacity: 0; }
+      100% { transform: scale(1) rotate(0); opacity: 1; }
+    }
+    #localVideo {
+      border: 3px solid #00f2fe;
+      outline: 2px solid #4facfe;
+      box-shadow: 0 0 32px #00f2fe55;
+      filter: drop-shadow(0 0 24px #00f2fe88);
+    }
+    #remoteVideo {
+      border: 3px solid #ff512f;
+      outline: 2px solid #dd2476;
+      box-shadow: 0 0 32px #ff512f55;
+      filter: drop-shadow(0 0 24px #ff512f88);
+    }
+    .footer {
+      margin-top: 30px;
+      color: #fff;
+      font-size: 1.1rem;
+      letter-spacing: 1px;
+      opacity: 0.8;
+      text-align: center;
+      font-family: 'Montserrat', Arial, sans-serif;
+      text-shadow: 0 1px 8px #ff512f44;
+    }
+    /* Responsive */
+    @media (max-width: 900px) {
+      .video-container {
+        flex-direction: column;
+        gap: 24px;
+        padding: 24px 10px;
+      }
+      video {
+        width: 95vw;
+        max-width: 340px;
+        height: 220px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h2>⚡ Welcome To Minhaj's Room ⚡</h2>
+  <div class="video-container">
+    <video id="localVideo" autoplay muted playsinline></video>
+    <video id="remoteVideo" autoplay playsinline></video>
+  </div>
+  <div class="footer">
+    Made with <span style="color:#ff512f;">&#10084;</span> | Ultra Stylish Edition
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // ...existing code...
+    const socket = io();
+
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+
+    const roomId = 'testroom'; // can be dynamic
+
+    let localStream;
+    let peerConnection;
+
+    // STUN server config
+    const config = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' }
+      ]
+    };
+
+    async function start() {
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localVideo.srcObject = localStream;
+
+      socket.emit('join-room', roomId);
+    }
+
+    socket.on('user-connected', async (userId) => {
+      console.log('User connected:', userId);
+      createPeerConnection(userId);
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      socket.emit('offer', offer);
+    });
+
+    socket.on('offer', async (offer, userId) => {
+      createPeerConnection(userId);
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      socket.emit('answer', answer);
+    });
+
+    socket.on('answer', async (answer) => {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    });
+
+    socket.on('ice-candidate', (candidate) => {
+      if (candidate) {
+        peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+      }
+    });
+
+    socket.on('user-disconnected', (userId) => {
+      console.log('User disconnected:', userId);
+      if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+      }
+      remoteVideo.srcObject = null;
+    });
+
+    function createPeerConnection(userId) {
+      peerConnection = new RTCPeerConnection(config);
+
+      // Add local stream tracks to peer connection
+      localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+      });
+
+      // When remote stream arrives
+      peerConnection.ontrack = (event) => {
+        remoteVideo.srcObject = event.streams[0];
+      };
+
+      // Send ICE candidates to other peer
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit('ice-candidate', event.candidate);
+        }
+      };
+    }
+
+    start();
+    // ...existing code...
+  </script>
+</body>
+</html>
